@@ -13,3 +13,13 @@ This is not 100% free. The monthly cost in case of a "Pay-AS-YOU-GO" subscriptio
 ## Windows
 
 AzureDNS supports Windows. You can check the details at  [Dynamic DNS in Azure (for Windows)](windows).
+
+
+## Linux
+
+AzureDNS supports Linux. You can check the details at  [Dynamic DNS in Azure (for Linux)](linux).
+
+
+# Other
+
+Feel free to get in touch if you ave any questions or you need some help.
