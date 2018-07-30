@@ -6,11 +6,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("azuredns")]
+[assembly: AssemblyTitle("AzureDNS")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("the1bithu")]
-[assembly: AssemblyProduct("azuredns")]
+[assembly: AssemblyProduct("AzureDNS")]
 [assembly: AssemblyCopyright("Copyright ©  2018")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -21,7 +21,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("d9ac5ff4-fb9a-433d-8813-827f50cf0cc1")]
+[assembly: Guid("e3ee5cf0-00a7-4a18-a4d4-f9ddeba02123")]
 
 // Version information for an assembly consists of the following four values:
 //
@@ -33,7 +33,7 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("18.7.0.0")]
-[assembly: AssemblyFileVersion("18.7.0.0")]
+[assembly: AssemblyVersion("18.8.0.0")]
+[assembly: AssemblyFileVersion("18.8.0.0")]
 [assembly: NeutralResourcesLanguage("en")]
 

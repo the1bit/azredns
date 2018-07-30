@@ -1,9 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Configuration;
+using System.ComponentModel;
+using System.Data;
+using System.Diagnostics;
 using System.Linq;
+using System.ServiceProcess;
 using System.Text;
 using System.Threading.Tasks;
+using System.Timers;
+using System.Runtime.InteropServices;
+
 // Azure related dependencies
 using Microsoft.Rest.Azure.Authentication;
 using Microsoft.Azure.Management.ResourceManager;
@@ -13,68 +19,146 @@ using Microsoft.Azure.Management.Dns.Models;
 // My classes
 using Enum;
 
-using System.Diagnostics;
 using System.Net;
 using System.Text.RegularExpressions;
 
-namespace azuredns
+namespace azuredns_srv
 {
-    class Azuredns
+    public partial class AzureDNS : ServiceBase
     {
-        private const string EVENTLOG_SOURCE = "azuredns";
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool SetServiceStatus(IntPtr handle, ref ServiceStatus serviceStatus);
 
-        static void Main(string[] args)
+        private const string EVENTLOG_SOURCE = "AzureDNS";
+        private string ZONE_NAME = null;
+        private string A_RECORD_NAME = null;
+        private string DNS_RESOURCE_GROUP = null;
+        private string CLOUD_NAME = null;
+        private string CLIENT_ID = null;
+        private string CLIENT_SECRET = null;
+        private string TENANT_ID = null;
+        private string SUBSCRIPTION_ID = null;
+
+
+        public AzureDNS(string[] args)
         {
-            //Create EventLog source
-            if (!EventLog.SourceExists(EVENTLOG_SOURCE))
-            {
-                // Create source if does not exist
-                EventLog.CreateEventSource(EVENTLOG_SOURCE, "Application");
-                return;
-            }
+            InitializeComponent();
 
-            // Init eventlog Writer
-            EventLog azureLog = new EventLog();
-            azureLog.Source = EVENTLOG_SOURCE;
+            string eventSourceName = EVENTLOG_SOURCE;
+            string logName = "Application";
+            if (args.Count() > 0)
+            {
+                eventSourceName = args[0];
+            }
+            if (args.Count() > 1)
+            {
+                logName = args[1];
+            }
+            azureLog = new System.Diagnostics.EventLog();
+            if (!System.Diagnostics.EventLog.SourceExists(eventSourceName))
+            {
+                System.Diagnostics.EventLog.CreateEventSource(eventSourceName, logName);
+            }
+            azureLog.Source = eventSourceName;
+            azureLog.Log = logName;
+        }
+
+
+        protected override void OnStart(string[] args)
+        {
+            azureLog.WriteEntry("Starting " + EVENTLOG_SOURCE + " service...");
+
+            // Update the service state to Start Pending.  
+            ServiceStatus serviceStatus = new ServiceStatus();
+            serviceStatus.dwCurrentState = ServiceState.SERVICE_START_PENDING;
+            serviceStatus.dwWaitHint = 100000;
+            SetServiceStatus(this.ServiceHandle, ref serviceStatus);
 
             // Get values from Configuration files
+            //// updateIntervalInMin
+            string updateIntervalInMin =
+                System.Configuration.ConfigurationManager.AppSettings.Get("updateIntervalInMin");
+
             //// Dns zone name
-            string zoneName =
+            ZONE_NAME =
                 System.Configuration.ConfigurationManager.AppSettings.Get("zoneName");
 
             //// A record name
-            string aRecordName =
+            A_RECORD_NAME =
                 System.Configuration.ConfigurationManager.AppSettings.Get("aRecordName");
 
             //// dnsResourceGroup
-            string dnsResourceGroup =
+            DNS_RESOURCE_GROUP =
                 System.Configuration.ConfigurationManager.AppSettings.Get("dnsResourceGroup");
 
             //// cloudName - AzureCloud, AzureGermanCloud
-            string cloudName =
+            CLOUD_NAME =
                 System.Configuration.ConfigurationManager.AppSettings.Get("azure.cloudName");
 
             //// clientID
-            string clientID =
+            CLIENT_ID =
                 System.Configuration.ConfigurationManager.AppSettings.Get("azure.clientID");
 
             //// clientSecret
-            string clientSecret =
+            CLIENT_SECRET =
                 System.Configuration.ConfigurationManager.AppSettings.Get("azure.clientSecret");
 
             //// Tenant
-            string tenant =
+            TENANT_ID =
                 System.Configuration.ConfigurationManager.AppSettings.Get("azure.tenant");
 
             //// subscriptionID
-            string subscriptionID =
+            SUBSCRIPTION_ID =
                 System.Configuration.ConfigurationManager.AppSettings.Get("azure.subscriptionID");
 
+            
 
+            // Set up a timer to trigger updateIntervalInMin.  
+            System.Timers.Timer timer = new System.Timers.Timer();
+            timer.Interval = Int32.Parse(updateIntervalInMin) * 60000;
+            timer.Elapsed += new System.Timers.ElapsedEventHandler(this.OnTimer);
+            timer.Start();
+
+            // Update the service state to Running.  
+            serviceStatus.dwCurrentState = ServiceState.SERVICE_RUNNING;
+            SetServiceStatus(this.ServiceHandle, ref serviceStatus);
+
+            // Manage DNS at starting
+            ManageDNS(CLOUD_NAME, TENANT_ID, CLIENT_ID, CLIENT_SECRET, SUBSCRIPTION_ID, ZONE_NAME, A_RECORD_NAME, Records.A, DNS_RESOURCE_GROUP, Operations.update, azureLog).Wait();
+        }
+
+        private int eventId = 1;
+
+        public void OnTimer(object sender, System.Timers.ElapsedEventArgs args)
+        {
             // Manage DNS
-            ManageDNS(cloudName, tenant, clientID, clientSecret, subscriptionID, zoneName, aRecordName, Records.A , dnsResourceGroup, Operations.update, azureLog).Wait();
+            ManageDNS(CLOUD_NAME, TENANT_ID, CLIENT_ID, CLIENT_SECRET, SUBSCRIPTION_ID, ZONE_NAME, A_RECORD_NAME, Records.A, DNS_RESOURCE_GROUP, Operations.update, azureLog).Wait();   
+        }
 
-            azureLog.WriteEntry("azureDNS exit.", EventLogEntryType.Information, 299);
+
+        protected override void OnStop()
+        {
+            // Update the service state to Start Pending.  
+            ServiceStatus serviceStatus = new ServiceStatus();
+            serviceStatus.dwCurrentState = ServiceState.SERVICE_START_PENDING;
+            serviceStatus.dwWaitHint = 100000;
+            SetServiceStatus(this.ServiceHandle, ref serviceStatus);
+
+            azureLog.WriteEntry("Stopping " + EVENTLOG_SOURCE + " service...");
+
+            // Update the service state to Running.  
+            serviceStatus.dwCurrentState = ServiceState.SERVICE_RUNNING;
+            SetServiceStatus(this.ServiceHandle, ref serviceStatus);
+        }
+
+        protected override void OnContinue()
+        {
+            azureLog.WriteEntry("Continue to run " + EVENTLOG_SOURCE + " service");
+        }
+
+        private void azureLog_EntryWritten(object sender, EntryWrittenEventArgs e)
+        {
+
         }
 
         private static string GetPIP()
@@ -100,7 +184,7 @@ namespace azuredns
                 dnsClient = new DnsManagementClient(serviceCreds);
                 dnsClient.SubscriptionId = subscriptionId;
             }
-                catch (System.Exception e)
+            catch (System.Exception e)
             {
                 azureLog.WriteEntry("Login error!\n---------------------\n" + e.Message + "\n---------------------\nProgram terminates and exit.", EventLogEntryType.Error, 400);
                 // Exit
@@ -136,9 +220,10 @@ namespace azuredns
             }
 
             //Create dnsZone if does not exist
-            if(status == Status.notexist)
+            if (status == Status.notexist)
             {
-                try { 
+                try
+                {
                     // Create zone parameter
                     var dnsZoneParams = new Zone("global"); // All DNS zones must have location = "global"
 
@@ -163,18 +248,18 @@ namespace azuredns
             {
                 case Status.success:
                     azureLog.WriteEntry(
-                        "DNS zone has been created successfully.\n---------------------\nzoneName: " + zoneName, 
+                        "DNS zone has been created successfully.\n---------------------\nzoneName: " + zoneName,
                         EventLogEntryType.Information, 200);
                     break;
                 case Status.error:
                     azureLog.WriteEntry(
-                        "An error has been occurred during DNS zone creation.\n---------------------\nzoneName: " + zoneName + "\n" + createMessage.Message, 
+                        "An error has been occurred during DNS zone creation.\n---------------------\nzoneName: " + zoneName + "\n" + createMessage.Message,
                         EventLogEntryType.Error, 401);
                     // Exit from code
                     return;
                 case Status.exists:
                     azureLog.WriteEntry(
-                        "DNS zone exists.\n---------------------\nzoneName: " + zoneName, 
+                        "DNS zone exists.\n---------------------\nzoneName: " + zoneName,
                         EventLogEntryType.Information, 202);
                     break;
             }
@@ -187,7 +272,7 @@ namespace azuredns
             {
                 // Exit with error
                 azureLog.WriteEntry(
-                    "An error has been occurred during public IP reading.", 
+                    "An error has been occurred during public IP reading.",
                     EventLogEntryType.Error, 403);
                 return;
             }
@@ -223,14 +308,14 @@ namespace azuredns
 
                             // Write success event to log
                             azureLog.WriteEntry(
-                                "Public IP update was success.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nCurrent PIP: " + pip + "\nReplaced PIP in Azure: " + aPIP, 
+                                "Public IP update was success.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nCurrent PIP: " + pip + "\nReplaced PIP in Azure: " + aPIP,
                                 EventLogEntryType.Information, 203);
                         }
                         else
                         {
                             // Write existing event to log
                             azureLog.WriteEntry(
-                                "Not required to update Public IP.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nCurrent PIP: " + pip + "\nPIP in Azure: " + aPIP, 
+                                "Not required to update Public IP.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nCurrent PIP: " + pip + "\nPIP in Azure: " + aPIP,
                                 EventLogEntryType.Information, 204);
                         }
                         // Set existing parameter
@@ -239,14 +324,14 @@ namespace azuredns
                     catch (System.Exception e)
                     {
                         azureLog.WriteEntry(
-                            "An error has been occurred during PIP update.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nPIP: " + pip + "\n" + e.Message, 
+                            "An error has been occurred during PIP update.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nPIP: " + pip + "\n" + e.Message,
                             EventLogEntryType.Error, 404);
                         return;
                     }
                     #endregion
 
-                    if (! isExisting)
-                    { 
+                    if (!isExisting)
+                    {
                         #region Create A Record
                         // **********************************************************************************************************
                         // Create A Record
@@ -271,13 +356,13 @@ namespace azuredns
 
                             // Write success event to log
                             azureLog.WriteEntry(
-                                "Public IP has been created successfully.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nCurrent PIP: " + pip, 
+                                "Public IP has been created successfully.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nCurrent PIP: " + pip,
                                 EventLogEntryType.Information, 205);
                         }
                         catch (System.Exception e)
                         {
                             azureLog.WriteEntry(
-                                "An error has been occurred during PIP creation.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nPIP: " + pip + "\n" + e.Message, 
+                                "An error has been occurred during PIP creation.\n---------------------\nzoneName: " + zoneName + "\nrecordName: " + recordName + "\nPIP: " + pip + "\n" + e.Message,
                                 EventLogEntryType.Error, 405);
                             return;
                         }

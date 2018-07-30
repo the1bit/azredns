@@ -9,6 +9,12 @@ This is not 100% free. The monthly cost in case of a "Pay-AS-YOU-GO" subscriptio
 
 # Changelog
 
+## v18.8.0
+
+* Run as a windows service
+* New configuration value:
+	* **updateIntervalInMin**
+
 ## v18.7.0
 
 * Can update dns zone in Azure
