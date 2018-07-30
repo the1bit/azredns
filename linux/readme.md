@@ -1,4 +1,4 @@
-Dynamic DNS in Azure (for Linux)
+Dynamic DNS onto Azure (for Linux)
 ===
 
 # Background

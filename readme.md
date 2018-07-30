@@ -1,4 +1,4 @@
-Dynamic DNS in Azure
+Dynamic DNS onto Azure
 ===
 
 # Background
@@ -12,12 +12,12 @@ This is not 100% free. The monthly cost in case of a "Pay-AS-YOU-GO" subscriptio
 
 ## Windows
 
-AzureDNS supports Windows. You can check the details at  [Dynamic DNS in Azure (for Windows)](windows).
+AzureDNS supports Windows. You can check the details at  [Dynamic DNS onto Azure (for Windows)](windows).
 
 
 ## Linux
 
-AzureDNS supports Linux. You can check the details at  [Dynamic DNS in Azure (for Linux)](linux).
+AzureDNS supports Linux. You can check the details at  [Dynamic DNS onto Azure (for Linux)](linux).
 
 
 # Other

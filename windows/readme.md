@@ -1,4 +1,4 @@
-﻿Dynamic DNS in Azure (for Windows)
+﻿Dynamic DNS onto Azure (for Windows)
 ===
 
 # Background
